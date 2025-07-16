@@ -79,7 +79,7 @@ export const API_UTILS = {
   },
   
   logFallback: (service, instance, url) => {
-    console.warn(`🔄 Fallback: ${service} instance ${instance} - ${url}`)
+    console.warn(` Fallback: ${service} instance ${instance} - ${url}`)
   },
   
   logHealthCheck: (service, results) => {

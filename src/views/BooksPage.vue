@@ -1,550 +1,434 @@
 <template>
-  <div class="books-page">
-    <div class="page-header">
-      <h1 class="page-title">Gestión de Libros</h1>
-      <p class="page-subtitle">Administra el catálogo de libros</p>
-    </div>
-    
-    <div class="content-container">
-      <div class="actions-bar">
-        <button class="btn btn-primary" @click="showCreateForm = true">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="8" x2="12" y2="16"></line>
-            <line x1="8" y1="12" x2="16" y2="12"></line>
-          </svg>
-          Nuevo Libro
-        </button>
+  <div class="home">
+    <!-- Header de la aplicación -->
+    <header class="app-header">
+      <div class="header-content">
+        <h1 class="app-title"> Sistema de Gestión de Libros</h1>
+        <p class="app-subtitle">Administra tu biblioteca de manera eficiente</p>
       </div>
-      
-      <div class="books-grid" v-if="books.length > 0">
-        <div class="book-card" v-for="book in books" :key="book.id">
-          <div class="book-cover">
-            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-            </svg>
-          </div>
-          <div class="book-info">
-            <h3 class="book-title">{{ book.title }}</h3>
-            <p class="book-isbn">ISBN: {{ book.isbn }}</p>
-            <div class="book-meta">
-              <span class="book-id">ID: {{ book.id }}</span>
-              <span class="book-version">v{{ book.version }}</span>
-            </div>
-            <p class="book-price">${{ book.price }}</p>
-          </div>
-          <div class="book-actions">
-            <button class="btn btn-secondary" @click="editBook(book)">Editar</button>
-            <button class="btn btn-danger" @click="deleteBook(book.id)">Eliminar</button>
-          </div>
+    </header>
+
+    <!-- Navegación por pestañas -->
+    <nav class="tab-navigation">
+      <button 
+        v-for="tab in tabs" 
+        :key="tab.id"
+        @click="activeTab = tab.id"
+        class="tab-button"
+        :class="{ 'active': activeTab === tab.id }"
+      >
+        {{ tab.icon }} {{ tab.label }}
+      </button>
+    </nav>
+
+    <!-- Contenido principal -->
+    <main class="main-content">
+      <!-- Pestaña: Lista de Libros -->
+      <div v-if="activeTab === 'list'" class="tab-content">
+        <BookList 
+          @edit-book="handleEditBook"
+          ref="bookList"
+        />
+      </div>
+
+      <!-- Pestaña: Agregar/Editar Libro -->
+      <div v-if="activeTab === 'add'" class="tab-content">
+        <div class="form-header">
+          <h2>{{ editingBook ? '✏️ Editar Libro' : '➕ Agregar Nuevo Libro' }}</h2>
+          <button 
+            v-if="editingBook" 
+            @click="cancelEdit"
+            class="cancel-edit-btn"
+          >
+            ❌ Cancelar Edición
+          </button>
         </div>
+        
+        <BookForm 
+          :book-to-edit="editingBook"
+          @book-saved="handleBookSaved"
+          @edit-cancelled="handleEditCancelled"
+        />
       </div>
-      
-      <!-- Formulario de Crear/Editar Libro -->
-      <div v-if="showCreateForm || editingBook" class="modal-overlay" @click="closeForm">
-        <div class="modal-content" @click.stop>
-          <div class="modal-header">
-            <h2>{{ editingBook ? 'Editar Libro' : 'Crear Nuevo Libro' }}</h2>
-            <button class="close-btn" @click="closeForm">×</button>
-          </div>
-          <form @submit.prevent="submitForm" class="book-form">
-            <div class="form-group">
-              <label for="title">Título del Libro *</label>
-              <input 
-                type="text" 
-                id="title" 
-                v-model="formData.title" 
-                required 
-                placeholder="Ingresa el título del libro"
-                :disabled="loading"
-              />
-            </div>
-            <div class="form-group">
-              <label for="isbn">ISBN *</label>
-              <input 
-                type="text" 
-                id="isbn" 
-                v-model="formData.isbn" 
-                required 
-                placeholder="Ej: 978-0-06-088328-7"
-                :disabled="loading"
-              />
-            </div>
-            <div class="form-group">
-              <label for="price">Precio *</label>
-              <input 
-                type="number" 
-                id="price" 
-                v-model.number="formData.price" 
-                required 
-                min="0"
-                step="0.01"
-                placeholder="Precio del libro"
-                :disabled="loading"
-              />
-            </div>
-            <div class="form-group">
-              <label for="version">Versión *</label>
-              <input 
-                type="number" 
-                id="version" 
-                v-model.number="formData.version" 
-                required 
-                min="1"
-                placeholder="Versión del libro (ej: 1)"
-                :disabled="loading"
-              />
-            </div>
-            <div class="form-actions">
-              <button type="button" class="btn btn-secondary" @click="closeForm" :disabled="loading">
-                Cancelar
-              </button>
-              <button type="submit" class="btn btn-primary" :disabled="loading || !isFormValid">
-                <span v-if="loading">Guardando...</span>
-                <span v-else>{{ editingBook ? 'Actualizar' : 'Crear' }}</span>
-              </button>
-            </div>
-          </form>
-        </div>
+
+      <!-- Pestaña: Búsqueda -->
+      <div v-if="activeTab === 'search'" class="tab-content">
+        <BookSearch 
+          @edit-book="handleEditBook"
+        />
       </div>
-      
-      <div class="empty-state" v-else>
-        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-        </svg>
-        <h3>No hay libros registrados</h3>
-        <p>Comienza agregando el primer libro al catálogo</p>
+
+      <!-- Pestaña: Gestión de Autores -->
+      <div v-if="activeTab === 'authors'" class="tab-content">
+        <AuthorsManager 
+          @authors-updated="handleAuthorsUpdated"
+        />
+      </div>
+    </main>
+
+    <!-- Notificaciones toast -->
+    <div v-if="notification" class="notification" :class="notification.type">
+      <div class="notification-content">
+        <span class="notification-message">{{ notification.message }}</span>
+        <button @click="closeNotification" class="notification-close">✖️</button>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import BooksClient from '@/clients/BooksClients.js'
+import BookList from '@/components/BookList.vue';
+import BookForm from '@/components/BookForm.vue';
+import BookSearch from '@/components/BookSearch.vue';
+import AuthorsManager from '@/components/AuthorsManager.vue';
 
 export default {
   name: 'BooksPage',
+  components: {
+    BookList,
+    BookForm,
+    BookSearch,
+    AuthorsManager
+  },
   data() {
     return {
-      books: [],
-      showCreateForm: false,
+      activeTab: 'list',
       editingBook: null,
-      loading: false,
-      formData: {
-        title: '',
-        isbn: '',
-        price: 0,
-        version: 1
-      }
-    }
-  },
-  computed: {
-    isFormValid() {
-      return this.formData.title.trim() && 
-             this.formData.isbn.trim() && 
-             this.formData.price > 0 && 
-             this.formData.version >= 1
-    }
-  },
-  async mounted() {
-    await this.loadBooks()
+      notification: null,
+      tabs: [
+        {
+          id: 'list',
+          label: 'Lista de Libros',
+          icon: '📖'
+        },
+        {
+          id: 'add',
+          label: 'Agregar Libro',
+          icon: '➕'
+        },
+        {
+          id: 'search',
+          label: 'Buscar Libros',
+          icon: '🔍'
+        },
+        {
+          id: 'authors',
+          label: 'Gestionar Autores',
+          icon: '👥'
+        }
+      ]
+    };
   },
   methods: {
-    async loadBooks() {
-      try {
-        this.loading = true
-        this.books = await BooksClient.getAll()
-      } catch (error) {
-        console.error('Error loading books:', error)
-        // Datos de ejemplo mientras no haya backend conectado
-        this.books = [
-          {
-            id: 1,
-            title: 'Cien años de soledad',
-            isbn: '978-0-06-088328-7',
-            version: 1,
-            price: 25.99
-          },
-          {
-            id: 2,
-            title: 'La casa de los espíritus',
-            isbn: '978-0-553-38391-7',
-            version: 1,
-            price: 22.50
-          },
-          {
-            id: 3,
-            title: 'El amor en los tiempos del cólera',
-            isbn: '978-0-307-38973-9',
-            version: 2,
-            price: 24.99
-          },
-          {
-            id: 4,
-            title: 'Rayuela',
-            isbn: '978-84-376-0494-7',
-            version: 1,
-            price: 28.50
-          }
-        ]
-      } finally {
-        this.loading = false
+    handleEditBook(book) {
+      console.log('Iniciando edición de libro:', book);
+      this.editingBook = { ...book }; // Crear una copia del libro
+      this.activeTab = 'add'; // Cambiar a la pestaña de formulario
+      this.showNotification('Libro cargado para edición', 'info');
+    },
+
+    handleBookSaved(savedBook) {
+      console.log('Libro guardado:', savedBook);
+      this.editingBook = null;
+      this.activeTab = 'list'; // Volver a la lista después de guardar
+      
+      // Refrescar la lista de libros
+      if (this.$refs.bookList) {
+        this.$refs.bookList.loadBooks();
       }
+      
+      this.showNotification('Libro guardado exitosamente', 'success');
     },
 
-    editBook(book) {
-      this.editingBook = { ...book }
-      this.formData.title = book.title
-      this.formData.isbn = book.isbn
-      this.formData.price = book.price
-      this.formData.version = book.version || 1
-      this.showCreateForm = false
+    handleEditCancelled() {
+      console.log('Edición cancelada');
+      this.editingBook = null;
+      this.showNotification('Edición cancelada', 'info');
     },
 
-    async deleteBook(id) {
-      if (confirm('¿Estás seguro de que quieres eliminar este libro?')) {
-        try {
-          this.loading = true
-          await BooksClient.delete(id)
-          await this.loadBooks()
-        } catch (error) {
-          console.error('Error deleting book:', error)
-          alert('Error al eliminar el libro')
-        } finally {
-          this.loading = false
-        }
-      }
+    cancelEdit() {
+      this.editingBook = null;
+      this.activeTab = 'list';
+      this.showNotification('Edición cancelada', 'info');
     },
 
-    async submitForm() {
-      if (!this.isFormValid) return
-
-      try {
-        this.loading = true
-        
-        if (this.editingBook) {
-          // Actualizar libro existente
-          await BooksClient.update(this.editingBook.id, {
-            title: this.formData.title.trim(),
-            isbn: this.formData.isbn.trim(),
-            price: this.formData.price,
-            version: this.formData.version
-          })
-        } else {
-          // Crear nuevo libro
-          await BooksClient.create({
-            title: this.formData.title.trim(),
-            isbn: this.formData.isbn.trim(),
-            price: this.formData.price,
-            version: this.formData.version
-          })
-        }
-        
-        await this.loadBooks()
-        this.closeForm()
-      } catch (error) {
-        console.error('Error saving book:', error)
-        alert('Error al guardar el libro. Por favor intenta de nuevo.')
-      } finally {
-        this.loading = false
-      }
+    handleAuthorsUpdated() {
+      console.log('Lista de autores actualizada');
+      // Si estamos en el formulario, podríamos refrescar la lista de autores disponibles
+      this.showNotification('Lista de autores actualizada', 'success');
     },
 
-    closeForm() {
-      this.showCreateForm = false
-      this.editingBook = null
-      this.formData.title = ''
-      this.formData.isbn = ''
-      this.formData.price = 0
-      this.formData.version = 1
-      this.loading = false
+    showNotification(message, type = 'info') {
+      this.notification = { message, type };
+      
+      // Auto-cerrar la notificación después de 3 segundos
+      setTimeout(() => {
+        this.closeNotification();
+      }, 3000);
+    },
+
+    closeNotification() {
+      this.notification = null;
     }
+  },
+  mounted() {
+    console.log('BooksPage component montado');
   }
-}
+};
 </script>
 
 <style scoped>
-.books-page {
-  padding: 2rem;
+.home {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.app-header {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 30px 20px;
+  text-align: center;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
   max-width: 1200px;
   margin: 0 auto;
 }
 
-.page-header {
-  text-align: center;
-  margin-bottom: 3rem;
+.app-title {
+  margin: 0 0 10px 0;
+  font-size: 36px;
+  font-weight: 700;
+  color: #333;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.page-title {
-  font-size: 2.5rem;
-  color: #2c3e50;
-  margin-bottom: 0.5rem;
+.app-subtitle {
+  margin: 0;
+  font-size: 18px;
+  color: #666;
+  font-weight: 400;
 }
 
-.page-subtitle {
-  color: #6c757d;
-  font-size: 1.1rem;
-}
-
-.actions-bar {
+.tab-navigation {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  padding: 0 20px;
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 2rem;
+  justify-content: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 }
 
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
+.tab-button {
+  background: none;
   border: none;
-  border-radius: 8px;
-  font-weight: 500;
+  padding: 15px 25px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #666;
   cursor: pointer;
   transition: all 0.3s ease;
-  text-decoration: none;
+  border-bottom: 3px solid transparent;
+  white-space: nowrap;
 }
 
-.btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+.tab-button:hover {
+  color: #333;
+  background: rgba(0, 0, 0, 0.05);
 }
 
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+.tab-button.active {
+  color: #6f42c1;
+  border-bottom-color: #6f42c1;
+  background: rgba(111, 66, 193, 0.05);
 }
 
-.btn-secondary {
+.main-content {
+  padding: 30px 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.tab-content {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.form-header h2 {
+  margin: 0;
+  color: #333;
+  font-size: 24px;
+}
+
+.cancel-edit-btn {
   background: #6c757d;
   color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 0.3s ease;
 }
 
-.btn-secondary:hover {
+.cancel-edit-btn:hover {
   background: #5a6268;
 }
 
-.btn-danger {
-  background: #dc3545;
-  color: white;
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  max-width: 400px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  animation: slideIn 0.3s ease;
 }
 
-.btn-danger:hover {
-  background: #c82333;
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
-.books-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.5rem;
+.notification.success {
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  color: #155724;
 }
 
-.book-card {
-  background: white;
-  border-radius: 12px;
-  padding: 1.5rem;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s ease;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
+.notification.info {
+  background: #cce7ff;
+  border: 1px solid #b3d9ff;
+  color: #004085;
 }
 
-.book-card:hover {
-  transform: translateY(-4px);
+.notification.warning {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  color: #856404;
 }
 
-.book-cover {
-  margin-bottom: 1rem;
-  color: #667eea;
+.notification.error {
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  color: #721c24;
 }
 
-.book-title {
-  color: #2c3e50;
-  font-size: 1.3rem;
-  margin-bottom: 0.5rem;
-}
-
-.book-isbn {
-  color: #6c757d;
-  font-size: 0.9rem;
-  margin-bottom: 1rem;
-  font-family: monospace;
-}
-
-.book-meta {
+.notification-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  padding: 15px;
 }
 
-.book-id {
-  color: #6c757d;
-  font-size: 0.9rem;
-  font-family: monospace;
-}
-
-.book-version {
-  background: rgba(102, 126, 234, 0.1);
-  color: #667eea;
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.8rem;
+.notification-message {
+  flex: 1;
   font-weight: 500;
 }
 
-.book-price {
-  color: #dc3545;
-  font-size: 1.2rem;
-  font-weight: bold;
-  margin-bottom: 1rem;
-}
-
-.book-actions {
-  display: flex;
-  gap: 0.5rem;
-  width: 100%;
-}
-
-.book-actions .btn {
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  flex: 1;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 3rem;
-  color: #6c757d;
-}
-
-.empty-state svg {
-  margin-bottom: 1rem;
-  opacity: 0.5;
-}
-
-.empty-state h3 {
-  margin-bottom: 0.5rem;
-  color: #2c3e50;
-}
-
-/* Estilos del modal y formulario */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: white;
-  border-radius: 12px;
-  padding: 0;
-  max-width: 500px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid #e9ecef;
-}
-
-.modal-header h2 {
-  margin: 0;
-  color: #2c3e50;
-}
-
-.close-btn {
+.notification-close {
   background: none;
   border: none;
-  font-size: 1.5rem;
+  font-size: 14px;
   cursor: pointer;
-  color: #6c757d;
-  padding: 0;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: background-color 0.2s;
+  margin-left: 10px;
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
 }
 
-.close-btn:hover {
-  background-color: #f8f9fa;
+.notification-close:hover {
+  opacity: 1;
 }
 
-.book-form {
-  padding: 1.5rem;
-}
-
-.form-group {
-  margin-bottom: 1.5rem;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-  color: #495057;
-}
-
-.form-group input {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #ced4da;
-  border-radius: 6px;
-  font-size: 1rem;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.form-group input:disabled {
-  background-color: #f8f9fa;
-  cursor: not-allowed;
-}
-
-.form-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-  margin-top: 2rem;
-  padding-top: 1rem;
-  border-top: 1px solid #e9ecef;
-}
-
+/* Responsive design */
 @media (max-width: 768px) {
-  .books-page {
-    padding: 1rem;
+  .app-title {
+    font-size: 28px;
   }
   
-  .books-grid {
-    grid-template-columns: 1fr;
+  .app-subtitle {
+    font-size: 16px;
   }
   
-  .book-actions {
+  .tab-navigation {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    padding: 0 10px;
+  }
+  
+  .tab-button {
+    padding: 12px 15px;
+    font-size: 14px;
+    flex: 1;
+    min-width: auto;
+  }
+  
+  .main-content {
+    padding: 20px 10px;
+  }
+  
+  .tab-content {
+    padding: 20px;
+    border-radius: 10px;
+  }
+  
+  .form-header {
     flex-direction: column;
+    gap: 15px;
+    align-items: stretch;
+  }
+  
+  .notification {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .tab-navigation {
+    flex-direction: column;
+  }
+  
+  .tab-button {
+    text-align: center;
+    border-bottom: 1px solid #e9ecef;
+    border-radius: 0;
+  }
+  
+  .tab-button:last-child {
+    border-bottom: none;
+  }
+  
+  .tab-button.active {
+    border-bottom-color: #e9ecef;
+    background: #6f42c1;
+    color: white;
   }
 }
 </style>

@@ -9,7 +9,7 @@ Este proyecto implementa un cliente web que se conecta a múltiples instancias d
 El sistema implementa una **estrategia de fallback en cascada**:
 
 1. **🎯 Traefik (Primario)**: Usa Traefik como load balancer principal
-2. **🔄 Fallback Directo**: Si Traefik falla, intenta conectar directamente a cada instancia
+2. ** Fallback Directo**: Si Traefik falla, intenta conectar directamente a cada instancia
 3. **⚡ Auto-retry**: Reintentos automáticos con delay configurable
 4. **💓 Health Monitoring**: Monitoreo en tiempo real del estado de las instancias
 
@@ -31,7 +31,7 @@ INSTANCE_URLS: [
 - **Traefik**: `http://localhost:80/authors`
 - **Instancias**: 8081, 8082, 8083
 
-### 📚 Books API
+###  Books API
 - **Traefik**: `http://localhost:80/books`
 - **Instancias**: 8084, 8085, 8086
 
@@ -196,7 +196,7 @@ npm run serve
 El sistema genera logs detallados:
 ```
 ✅ API Success: GET http://localhost:80/authors
-🔄 Trying Authors instance 2: http://localhost:8082/authors
+ Trying Authors instance 2: http://localhost:8082/authors
 ❌ Authors instance 1 failed: Network Error
 💓 Health Check Authors: 2/3 healthy
 ```
@@ -253,7 +253,7 @@ RETRY: {
 2. Confirmar que las URLs son accesibles
 3. Revisar firewall y permisos de red
 
-## 📚 Recursos Adicionales
+##  Recursos Adicionales
 
 - [Documentación de Traefik](https://doc.traefik.io/traefik/)
 - [Documentación de Consul](https://www.consul.io/docs)
