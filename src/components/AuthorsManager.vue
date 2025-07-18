@@ -43,7 +43,7 @@
 </template>
 
 <script>
-import { api } from '@/clients/BooksClients.js';
+import AuthorsClient from '@/clients/AuthorsClients.js';
 
 export default {
   name: 'AuthorsManager',
@@ -59,8 +59,8 @@ export default {
   methods: {
     async loadAuthors() {
       try {
-        const response = await api.authors.getAll();
-        this.authors = response.data || [];
+        const response = await AuthorsClient.getAll();
+        this.authors = response || [];
       } catch (error) {
         console.error('Error cargando autores:', error);
         this.authors = [];
@@ -85,8 +85,8 @@ export default {
       }
 
       try {
-        const response = await api.authors.create({ name: name });
-        console.log('Autor creado:', response.data);
+        const response = await AuthorsClient.create({ name: name });
+        console.log('Autor creado:', response);
         
         this.newAuthorName = '';
         await this.loadAuthors(); // Recargar la lista

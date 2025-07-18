@@ -10,12 +10,6 @@
         >
           {{ loading ? 'Cargando...' : '🔄 Actualizar' }}
         </button>
-        <button 
-          @click="showCreateForm = true" 
-          class="add-btn"
-        >
-          ➕ Nuevo Cliente
-        </button>
       </div>
     </div>
 
@@ -66,13 +60,6 @@
 
         <div class="customer-actions">
           <button 
-            @click="editCustomer(customer)" 
-            class="action-btn edit-btn"
-            title="Editar cliente"
-          >
-            ✏️
-          </button>
-          <button 
             @click="viewCustomerDetails(customer)" 
             class="action-btn view-btn"
             title="Ver detalles"
@@ -117,60 +104,6 @@
       </button>
     </div>
 
-    <!-- Modal para crear/editar cliente -->
-    <div v-if="showCreateForm || editingCustomer" class="modal-overlay" @click="closeForm">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h3>{{ editingCustomer ? 'Editar Cliente' : 'Nuevo Cliente' }}</h3>
-          <button @click="closeForm" class="close-btn">✖️</button>
-        </div>
-        
-        <form @submit.prevent="saveCustomer" class="customer-form">
-          <div class="form-group">
-            <label>Nombre *</label>
-            <input 
-              v-model="form.name" 
-              type="text" 
-              required
-              placeholder="Nombre completo del cliente"
-            />
-          </div>
-          
-          <div class="form-group">
-            <label>Email *</label>
-            <input 
-              v-model="form.email" 
-              type="email" 
-              required
-              placeholder="email@ejemplo.com"
-            />
-          </div>
-          
-          <div class="form-group">
-            <label>Versión</label>
-            <input 
-              v-model.number="form.version" 
-              type="number" 
-              min="1"
-              placeholder="1"
-            />
-          </div>
-          
-          <div class="form-actions">
-            <button type="button" @click="closeForm" class="cancel-btn">
-              Cancelar
-            </button>
-            <button 
-              type="submit" 
-              class="save-btn"
-              :disabled="!isFormValid || saving"
-            >
-              {{ saving ? 'Guardando...' : (editingCustomer ? 'Actualizar' : 'Crear') }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
 
     <!-- Modal de detalles del cliente -->
     <div v-if="selectedCustomer" class="modal-overlay" @click="selectedCustomer = null">
@@ -179,7 +112,6 @@
           <h3>Detalles del Cliente</h3>
           <button @click="selectedCustomer = null" class="close-btn">✖️</button>
         </div>
-        
         <div class="customer-details-content">
           <div class="detail-group">
             <strong>ID:</strong> {{ selectedCustomer.id }}
@@ -193,11 +125,15 @@
           <div class="detail-group">
             <strong>Versión:</strong> {{ selectedCustomer.version || 1 }}
           </div>
-          
-          <div class="detail-actions">
-            <button @click="editCustomer(selectedCustomer)" class="edit-detail-btn">
-              ✏️ Editar Cliente
-            </button>
+          <div class="detail-group">
+            <strong>Órdenes de compra:</strong>
+            <div v-if="loadingOrders">Cargando órdenes...</div>
+            <div v-else-if="orders.length === 0">No hay órdenes para este cliente.</div>
+            <ul v-else>
+              <li v-for="order in orders" :key="order.id">
+                <strong>ID:</strong> {{ order.id }} | <strong>Fecha:</strong> {{ order.date || order.createdAt || 'N/A' }} | <strong>Total:</strong> ${{ order.total || order.amount || 'N/A' }}
+              </li>
+            </ul>
           </div>
         </div>
       </div>
@@ -214,18 +150,12 @@ export default {
     return {
       customers: [],
       loading: false,
-      saving: false,
       searchTerm: '',
       currentPage: 1,
       itemsPerPage: 10,
-      showCreateForm: false,
-      editingCustomer: null,
       selectedCustomer: null,
-      form: {
-        name: '',
-        email: '',
-        version: 1
-      }
+      orders: [],
+      loadingOrders: false
     }
   },
   computed: {
@@ -252,10 +182,6 @@ export default {
     uniqueEmails() {
       const emails = new Set(this.customers.map(c => c.email))
       return emails.size
-    },
-    
-    isFormValid() {
-      return this.form.name.trim() && this.form.email.trim()
     }
   },
   watch: {
@@ -287,16 +213,17 @@ export default {
         .substring(0, 2)
     },
 
-    editCustomer(customer) {
-      this.editingCustomer = { ...customer }
-      this.form.name = customer.name
-      this.form.email = customer.email
-      this.form.version = customer.version || 1
-      this.selectedCustomer = null
-    },
-
-    viewCustomerDetails(customer) {
+    async viewCustomerDetails(customer) {
       this.selectedCustomer = customer
+      this.loadingOrders = true
+      this.orders = []
+      try {
+        this.orders = await CustomersClient.getAllByCustomerId(customer.id)
+      } catch (error) {
+        this.orders = []
+      } finally {
+        this.loadingOrders = false
+      }
     },
 
     async deleteCustomer(id) {
@@ -312,44 +239,6 @@ export default {
         console.error('Error eliminando cliente:', error)
         this.$emit('error', 'Error al eliminar el cliente')
       }
-    },
-
-    async saveCustomer() {
-      if (!this.isFormValid) return
-
-      try {
-        this.saving = true
-        
-        const customerData = {
-          name: this.form.name.trim(),
-          email: this.form.email.trim(),
-          version: this.form.version || 1
-        }
-
-        if (this.editingCustomer) {
-          await CustomersClient.update(this.editingCustomer.id, customerData)
-          this.$emit('success', 'Cliente actualizado exitosamente')
-        } else {
-          await CustomersClient.create(customerData)
-          this.$emit('success', 'Cliente creado exitosamente')
-        }
-        
-        await this.loadCustomers()
-        this.closeForm()
-      } catch (error) {
-        console.error('Error guardando cliente:', error)
-        this.$emit('error', 'Error al guardar el cliente')
-      } finally {
-        this.saving = false
-      }
-    },
-
-    closeForm() {
-      this.showCreateForm = false
-      this.editingCustomer = null
-      this.form.name = ''
-      this.form.email = ''
-      this.form.version = 1
     }
   }
 }
@@ -379,7 +268,7 @@ export default {
   gap: 0.5rem;
 }
 
-.refresh-btn, .add-btn {
+.refresh-btn {
   padding: 0.5rem 1rem;
   border: none;
   border-radius: 4px;
@@ -400,15 +289,6 @@ export default {
 .refresh-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-}
-
-.add-btn {
-  background: #28a745;
-  color: white;
-}
-
-.add-btn:hover {
-  background: #218838;
 }
 
 .stats {

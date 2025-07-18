@@ -147,7 +147,7 @@
 </template>
 
 <script>
-import { api } from '@/clients/BooksClients.js';
+import BooksClient from '@/clients/BooksClients.js';
 
 export default {
   name: 'BookSearch',
@@ -187,12 +187,11 @@ export default {
         this.loading = true;
         
         try {
-          const response = await api.books.search({
+          const response = await BooksClient.search({
             query: this.searchQuery,
             type: this.filterType
           });
-          
-          this.searchResults = response.data || [];
+          this.searchResults = response || [];
           console.log(`Búsqueda completada: ${this.searchResults.length} resultados`);
         } catch (error) {
           console.error('Error en búsqueda:', error);
@@ -210,8 +209,8 @@ export default {
 
     async searchInAllBooks() {
       try {
-        const response = await api.books.getAll();
-        const allBooks = response.data || [];
+        const response = await BooksClient.getAll();
+        const allBooks = response || [];
         
         this.searchResults = allBooks.filter(book => {
           const query = this.searchQuery.toLowerCase();

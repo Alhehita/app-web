@@ -111,7 +111,7 @@
 </template>
 
 <script>
-import { api } from '@/clients/BooksClients.js';
+import BooksClient from '@/clients/BooksClients.js';
 
 export default {
   name: 'BookList',
@@ -133,8 +133,8 @@ export default {
     async loadBooks() {
       this.loading = true;
       try {
-        const response = await api.books.getAll();
-        this.books = response.data || [];
+        const response = await BooksClient.getAll();
+        this.books = response || [];
         console.log('Libros cargados:', this.books.length);
       } catch (error) {
         console.error('Error cargando libros:', error);

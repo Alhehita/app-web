@@ -152,7 +152,8 @@
 </template>
 
 <script>
-import { api } from '@/clients/BooksClients.js';
+import BooksClient from '@/clients/BooksClients.js';
+import AuthorsClient from '@/clients/AuthorsClients.js';
 
 export default {
   props: ['bookToEdit', 'refreshAuthors'],
@@ -207,8 +208,8 @@ export default {
   methods: {
     async loadAvailableAuthors() {
       try {
-        const response = await api.authors.getAll();
-        this.availableAuthors = response.data || [];
+        const response = await AuthorsClient.getAll();
+        this.availableAuthors = response || [];
       } catch (error) {
         console.error('Error cargando autores:', error);
         this.availableAuthors = [];
@@ -287,13 +288,13 @@ export default {
 
         if (this.editMode) {
           // Para actualizar libro
-          const response = await api.books.update(this.form.isbn, bookDto);
-          console.log('Libro actualizado:', response.data);
+          const response = await BooksClient.update(this.form.isbn, bookDto);
+          console.log('Libro actualizado:', response);
           alert('Libro actualizado exitosamente');
         } else {
           // Para crear nuevo libro
-          const response = await api.books.create(bookDto);
-          console.log('Libro creado:', response.data);
+          const response = await BooksClient.create(bookDto);
+          console.log('Libro creado:', response);
           alert('Libro agregado exitosamente');
         }
         
