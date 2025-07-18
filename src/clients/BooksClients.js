@@ -1,194 +1,103 @@
-import axios from 'axios';
+import axios from 'axios'
 
-// Configuración base para todas las APIs
-// En desarrollo, usar proxy configurado en vue.config.js
-const API_BASE_URL = process.env.NODE_ENV === 'development' ? '/api' : 'http://localhost';
+// Configuración de Traefik como balanceador principal
+const TRAEFIK_BASE_URL = process.env.NODE_ENV === 'development' ? '' : 'http://localhost:80'
 
-// Crear instancias de axios para diferentes servicios
-const apiBooks = axios.create({
-  baseURL: `${API_BASE_URL}/books`,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json'
+// URL de fallback directo a la instancia de books (puerto 9090)
+const FALLBACK_URLS = [
+  'http://localhost:9090'
+]
+
+class BooksClient {
+  constructor() {
+    this.timeout = 5000 // 5 segundos
   }
-});
 
-const apiAuthors = axios.create({
-  baseURL: `${API_BASE_URL}/authors`,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json'
+  // Crear instancia de axios con configuración
+  createAxiosInstance(baseURL) {
+    return axios.create({
+      baseURL,
+      timeout: this.timeout,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
   }
-});
 
-const apiInventory = axios.create({
-  baseURL: `${API_BASE_URL}/inventory`,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
-
-// Interceptores para manejo de errores global
-const setupInterceptors = (apiInstance, serviceName) => {
-  // Request interceptor
-  apiInstance.interceptors.request.use(
-    (config) => {
-      console.log(`[${serviceName}] Request:`, config.method.toUpperCase(), config.url);
-      return config;
-    },
-    (error) => {
-      console.error(`[${serviceName}] Request Error:`, error);
-      return Promise.reject(error);
-    }
-  );
-
-  // Response interceptor
-  apiInstance.interceptors.response.use(
-    (response) => {
-      console.log(`[${serviceName}] Response:`, response.status, response.config.url);
-      return response;
-    },
-    (error) => {
-      const status = error.response?.status;
-      const url = error.config?.url;
-      console.error(`[${serviceName}] Response Error:`, status, url, error.message);
+  // Método principal que intenta Traefik primero, luego fallback
+  async makeRequest(endpoint, options = {}) {
+    // Intentar con Traefik primero (o proxy en desarrollo)
+    try {
+      const trafikApi = this.createAxiosInstance(TRAEFIK_BASE_URL)
+      const fullUrl = `/api/books${endpoint}`
+      console.log('Intentando conexión:', TRAEFIK_BASE_URL + fullUrl)
+      const response = await trafikApi.request({
+        url: fullUrl,
+        ...options
+      })
+      return response.data
+    } catch (trafikError) {
+      console.warn('Conexión principal no disponible, intentando con instancia directa:', trafikError.message)
       
-      // Manejo global de errores
-      if (status === 404) {
-        console.warn(`[${serviceName}] Recurso no encontrado: ${url}`);
-      } else if (status === 500) {
-        console.error(`[${serviceName}] Error interno del servidor: ${url}`);
-      } else if (status === 400) {
-        console.warn(`[${serviceName}] Solicitud inválida: ${url}`);
+      // Fallback a instancia directa del servicio books
+      for (const fallbackUrl of FALLBACK_URLS) {
+        try {
+          const directApi = this.createAxiosInstance(fallbackUrl)
+          const fullUrl = `/books${endpoint}`
+          console.log('Intentando fallback:', fallbackUrl + fullUrl)
+          const response = await directApi.request({
+            url: fullUrl,
+            ...options
+          })
+          console.log('Respuesta exitosa desde:', fallbackUrl + fullUrl)
+          return response.data
+        } catch (error) {
+          console.warn(`Instancia ${fallbackUrl} no disponible:`, error.message)
+          continue
+        }
       }
       
-      return Promise.reject(error);
-    }
-  );
-};
-
-// Configurar interceptores para cada API
-setupInterceptors(apiBooks, 'Books');
-setupInterceptors(apiAuthors, 'Authors');
-setupInterceptors(apiInventory, 'Inventory');
-
-// === SERVICIOS DE LIBROS ===
-export const booksService = {
-  // Obtener todos los libros
-  getAll: () => apiBooks.get(''),
-  
-  // Obtener libro por ISBN
-  getByIsbn: (isbn) => apiBooks.get(`/${isbn}`),
-  
-  // Crear nuevo libro
-  create: (bookData) => apiBooks.post('', bookData),
-  
-  // Actualizar libro
-  update: (isbn, bookData) => apiBooks.put(`/${isbn}`, bookData),
-  
-  // Eliminar libro
-  delete: (isbn) => apiBooks.delete(`/${isbn}`),
-  
-  // Ping para verificar conexión
-  ping: () => apiBooks.get('/ping'),
-  
-  // Buscar libros (si tienes endpoint de búsqueda)
-  search: (query) => apiBooks.get(`/search?q=${encodeURIComponent(query)}`)
-};
-
-// === SERVICIOS DE AUTORES ===
-export const authorsService = {
-  // Obtener todos los autores
-  getAll: () => apiAuthors.get(''),
-  
-  // Obtener autor por ID
-  getById: (id) => apiAuthors.get(`/${id}`),
-  
-  // Crear nuevo autor
-  create: (authorData) => apiAuthors.post('', authorData),
-  
-  // Actualizar autor
-  update: (id, authorData) => apiAuthors.put(`/${id}`, authorData),
-  
-  // Eliminar autor
-  delete: (id) => apiAuthors.delete(`/${id}`),
-  
-  // Obtener autores por libro
-  getByBook: (isbn) => apiAuthors.get(`/book/${isbn}`),
-  
-  // Asociar autor a libro
-  associateToBook: (isbn, authorId) => apiAuthors.post(`/associate/${isbn}/${authorId}`),
-  
-  // Desasociar autor de libro
-  disassociateFromBook: (isbn, authorId) => apiAuthors.delete(`/associate/${isbn}/${authorId}`)
-};
-
-// === SERVICIOS DE INVENTARIO ===
-export const inventoryService = {
-  // Obtener todo el inventario
-  getAll: () => apiInventory.get(''),
-  
-  // Obtener inventario por ISBN
-  getByIsbn: (isbn) => apiInventory.get(`/${isbn}`),
-  
-  // Crear entrada de inventario
-  create: (inventoryData) => apiInventory.post('', inventoryData),
-  
-  // Actualizar inventario
-  update: (isbn, inventoryData) => apiInventory.put(`/${isbn}`, inventoryData),
-  
-  // Eliminar entrada de inventario
-  delete: (isbn) => apiInventory.delete(`/${isbn}`)
-};
-
-// === SERVICIO UNIFICADO ===
-export const api = {
-  books: booksService,
-  authors: authorsService,
-  inventory: inventoryService,
-  
-  // Métodos de utilidad
-  utils: {
-    // Verificar conectividad de todos los servicios
-    async checkHealth() {
-      const results = {};
-      
-      try {
-        await booksService.ping();
-        results.books = 'OK';
-      } catch (error) {
-        results.books = 'ERROR';
-      }
-      
-      try {
-        await authorsService.getAll();
-        results.authors = 'OK';
-      } catch (error) {
-        results.authors = 'ERROR';
-      }
-      
-      try {
-        await inventoryService.getAll();
-        results.inventory = 'OK';
-      } catch (error) {
-        results.inventory = 'ERROR';
-      }
-      
-      return results;
-    },
-    
-    // Configurar base URL dinámicamente
-    setBaseUrl(newBaseUrl) {
-      apiBooks.defaults.baseURL = `${newBaseUrl}/books`;
-      apiAuthors.defaults.baseURL = `${newBaseUrl}/API/v1.0/authors`;
-      apiInventory.defaults.baseURL = `${newBaseUrl}/inventory`;
+      throw new Error('Servicio de books no disponible')
     }
   }
-};
 
-// Exportaciones de compatibilidad hacia atrás
-export { apiBooks, apiAuthors };
+  // Obtener todos los libros (GET /books)
+  async getAll() {
+    return await this.makeRequest('')
+  }
 
-// Exportación por defecto
-export default api;
+  // Obtener libro por ID (GET /books/{id})
+  async getById(id) {
+    return await this.makeRequest(`/${id}`)
+  }
+
+  // Obtener libro por ISBN (GET /books/by-isbn/{isbn})
+  async getByIsbn(isbn) {
+    return await this.makeRequest(`/by-isbn/${isbn}`)
+  }
+
+  // Crear nuevo libro (POST /books)
+  async create(book) {
+    return await this.makeRequest('', {
+      method: 'POST',
+      data: book
+    })
+  }
+
+  // Actualizar libro (PUT /books/{id})
+  async update(id, book) {
+    return await this.makeRequest(`/${id}`, {
+      method: 'PUT',
+      data: book
+    })
+  }
+
+  // Eliminar libro (DELETE /books/{id})
+  async delete(id) {
+    return await this.makeRequest(`/${id}`, {
+      method: 'DELETE'
+    })
+  }
+}
+
+export default new BooksClient()

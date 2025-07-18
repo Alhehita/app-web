@@ -1,12 +1,11 @@
 import axios from 'axios'
 
-// Configuración de la API de customers
-// En desarrollo usamos el proxy configurado en vue.config.js
-const API_BASE_URL = process.env.NODE_ENV === 'development' ? '/api' : 'http://localhost'
+// Configuración de Traefik como balanceador principal
+const TRAEFIK_BASE_URL = process.env.NODE_ENV === 'development' ? '' : 'http://localhost:80'
 
-// URL de fallback directo a la instancia de customers
+// URL de fallback directo a la instancia de customers (puerto 8083)
 const FALLBACK_URLS = [
-  'http://localhost:8083/API/v1.0'
+  'http://localhost:7070'
 ]
 
 class CustomersClient {
@@ -25,27 +24,32 @@ class CustomersClient {
     })
   }
 
-  // Método principal que intenta la API directamente
+  // Método principal que intenta Traefik primero, luego fallback
   async makeRequest(endpoint, options = {}) {
-    // Intentar con la API principal primero
+    // Intentar con Traefik primero (o proxy en desarrollo)
     try {
-      const apiInstance = this.createAxiosInstance(API_BASE_URL)
-      const response = await apiInstance.request({
-        url: `/customers${endpoint}`,
+      const trafikApi = this.createAxiosInstance(TRAEFIK_BASE_URL)
+      const fullUrl = `/api/customers${endpoint}`
+      console.log('Intentando conexión:', TRAEFIK_BASE_URL + fullUrl)
+      const response = await trafikApi.request({
+        url: fullUrl,
         ...options
       })
       return response.data
-    } catch (apiError) {
-      console.warn('API principal no disponible, intentando con instancia directa:', apiError.message)
+    } catch (trafikError) {
+      console.warn('Conexión principal no disponible, intentando con instancia directa:', trafikError.message)
       
       // Fallback a instancia directa del servicio customers
       for (const fallbackUrl of FALLBACK_URLS) {
         try {
           const directApi = this.createAxiosInstance(fallbackUrl)
+          const fullUrl = `/customers${endpoint}`
+          console.log('Intentando fallback:', fallbackUrl + fullUrl)
           const response = await directApi.request({
-            url: `/customers${endpoint}`,
+            url: fullUrl,
             ...options
           })
+          console.log('Respuesta exitosa desde:', fallbackUrl + fullUrl)
           return response.data
         } catch (error) {
           console.warn(`Instancia ${fallbackUrl} no disponible:`, error.message)
@@ -57,17 +61,17 @@ class CustomersClient {
     }
   }
 
-  // Obtener todos los clientes (GET http://localhost/customers)
+  // Obtener todos los clientes (GET /customers)
   async getAll() {
     return await this.makeRequest('')
   }
 
-  // Obtener cliente por ID (GET http://localhost/customers/{id})
+  // Obtener cliente por ID (GET /customers/{id})
   async getById(id) {
     return await this.makeRequest(`/${id}`)
   }
 
-  // Crear nuevo cliente (POST http://localhost/customers)
+  // Crear nuevo cliente (POST /customers)
   async create(customer) {
     return await this.makeRequest('', {
       method: 'POST',
@@ -75,7 +79,7 @@ class CustomersClient {
     })
   }
 
-  // Actualizar cliente (PUT http://localhost/customers/{id})
+  // Actualizar cliente (PUT /customers/{id})
   async update(id, customer) {
     return await this.makeRequest(`/${id}`, {
       method: 'PUT',
@@ -83,7 +87,7 @@ class CustomersClient {
     })
   }
 
-  // Eliminar cliente (DELETE http://localhost/customers/{id})
+  // Eliminar cliente (DELETE /customers/{id})
   async delete(id) {
     return await this.makeRequest(`/${id}`, {
       method: 'DELETE'
@@ -92,7 +96,7 @@ class CustomersClient {
 
   // Obtener cliente por email (GET /customers/by-email/{email})
   async getByEmail(email) {
-    return await this.makeRequest(`/by-email/${email}`)
+    return await this.makeRequest(`/by-email/${encodeURIComponent(email)}`)
   }
 }
 

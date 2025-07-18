@@ -1,11 +1,11 @@
 import axios from 'axios'
 
 // Configuración de Traefik como balanceador principal
-const TRAEFIK_BASE_URL = 'http://localhost:80'
+const TRAEFIK_BASE_URL = process.env.NODE_ENV === 'development' ? '' : 'http://localhost:80'
 
 // URL de fallback directo a la instancia de authors (puerto 8081)
 const FALLBACK_URLS = [
-  'http://localhost:8081/API/v1.0'
+  'http://localhost:8081'
 ]
 
 class AuthorsClient {
@@ -26,18 +26,18 @@ class AuthorsClient {
 
   // Método principal que intenta Traefik primero, luego fallback
   async makeRequest(endpoint, options = {}) {
-    // Intentar con Traefik primero
+    // Intentar con Traefik primero (o proxy en desarrollo)
     try {
       const trafikApi = this.createAxiosInstance(TRAEFIK_BASE_URL)
       const fullUrl = `/api/authors${endpoint}`
-      console.log('Intentando Traefik:', TRAEFIK_BASE_URL + fullUrl)
+      console.log('Intentando conexión:', TRAEFIK_BASE_URL + fullUrl)
       const response = await trafikApi.request({
         url: fullUrl,
         ...options
       })
       return response.data
     } catch (trafikError) {
-      console.warn('Traefik no disponible, intentando con instancia directa:', trafikError.message)
+      console.warn('Conexión principal no disponible, intentando con instancia directa:', trafikError.message)
       
       // Fallback a instancia directa del servicio authors
       for (const fallbackUrl of FALLBACK_URLS) {

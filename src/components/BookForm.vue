@@ -152,7 +152,7 @@
 </template>
 
 <script>
-import { api } from '@/clients/BooksClients.js';
+import BooksClient from '@/clients/BooksClients.js';
 
 export default {
   props: ['bookToEdit', 'refreshAuthors'],
@@ -287,13 +287,13 @@ export default {
 
         if (this.editMode) {
           // Para actualizar libro
-          const response = await api.books.update(this.form.isbn, bookDto);
-          console.log('Libro actualizado:', response.data);
+          const response = await BooksClient.update(this.form.id, bookDto);
+          console.log('Libro actualizado:', response);
           alert('Libro actualizado exitosamente');
         } else {
           // Para crear nuevo libro
-          const response = await api.books.create(bookDto);
-          console.log('Libro creado:', response.data);
+          const response = await BooksClient.create(bookDto);
+          console.log('Libro creado:', response);
           alert('Libro agregado exitosamente');
         }
         
